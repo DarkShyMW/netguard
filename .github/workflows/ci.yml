@@ -44,8 +44,11 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install pytest flake8
           pip install .
-      - name: Collect plugins sanity check
+      - name: Collect plugins sanity check (from repo root)
         run: python -m netguard plugins
+      - name: Sanity check from inside package dir (regression for ModuleNotFoundError)
+        working-directory: netguard
+        run: python -c "import netguard.cli, netguard.engine, netguard.models"
       - name: Test with pytest
         # запуск из корня репозитория; conftest.py добавляет его в sys.path,
         # поэтому тесты идут по исходникам даже без установки пакета
