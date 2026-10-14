@@ -122,6 +122,52 @@ class RedisNoAuthPlugin(Plugin):
             return None
         return None
 
+@register
+class VncNoAuthPlugin(Plugin):
+    id = "vnc_no_auth"
+    name = "VNC: Accessing without authentication"
+    severity = "high"
+    cvss = 8.1
+    cwe = "CWE-306"
+    applies_to_services = ["vnc"]
+    applies_to_ports = [5900, 5901, 5902]
+    references = [
+        "https://www.rfc-editor.org/rfc/rfc6143",
+        "https://attack.mitre.org/techniques/T1078/",
+    ]
+    remediation = "Enable VNC authentication (password) and use SSH/VPN tunnel."
+
+    def check(self, host: Host, svc: Service) -> Optional[List[Finding]]:
+        try:
+            s = socket.create_connection((host.ip, svc.port), timeout=2.0)
+        except OSError:
+            return None
+        try:
+            s.settimeout(2.0)
+            banner = s.recv(12)
+            if not banner.startswith(b"RFB "):
+                return None
+            s.sendall(banner[:12])
+            n_raw = s.recv(1)
+            if not n_raw:
+                return None
+            n = n_raw[0]
+            if n == 0:
+                return None
+            types = s.recv(n)
+            if 1 not in types:
+                return None
+            return [self.make_finding(
+                svc,
+                evidence=f"RFB {banner[4:].decode('ascii', 'replace').strip()} → "
+                         f"security types={sorted(types)} на {host.ip}:{svc.port}",
+                description="VNC-server accepts Security Type 1 (None) - access without password, "
+                            "full access to remote desktop.",
+            )]
+        except OSError:
+            return None
+        finally:
+            s.close()
 
 @register
 class MemcachedInfoPlugin(Plugin):
